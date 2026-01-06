@@ -1,0 +1,25 @@
+# Don't publish these to npm
+.git/
+.github/
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Don't publish user's local config
+doc-syncer.config.yml
+
+# Don't publish dev files
+.env
+.env.local
+
+# Don't publish Claude artifacts
+.claude/
+
+# Test and development files
+test/
+tests/
+*.test.ts
+*.spec.ts

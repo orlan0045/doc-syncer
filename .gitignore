@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+bun.lockb
+
+# Environment and local config
+.env
+.env.local
+doc-syncer.config.yml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+PUBLISHING.md
+AGENTS.md
+CLAUDE.md

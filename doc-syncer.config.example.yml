@@ -1,0 +1,28 @@
+# doc-syncer configuration example
+# Copy this file to doc-syncer.config.yml and customize for your repos
+
+# Which AI agent to run: claude | codex
+agent: claude
+
+# Branch to compare against
+base_branch: main
+
+# Tool permissions for the agent (default: Read, Write, Edit)
+permissions:
+  - Read
+  - Write
+  - Edit
+
+# Modes allow you to configure multiple code/docs repo pairs
+# Use --mode <name> to select which mode to run
+modes:
+  # Example mode 1: Frontend app
+  frontend:
+    default: true  # Use this mode by default if --mode not specified
+    code_repo: /path/to/your/code-repo
+    docs_repo: /path/to/your/docs-repo
+
+  # Example mode 2: Backend API
+  backend:
+    code_repo: /path/to/your/api-repo
+    docs_repo: /path/to/your/api-docs-repo
