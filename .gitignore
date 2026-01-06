@@ -1,6 +1,6 @@
 # Dependencies
 node_modules/
-bun.lockb
+*.tgz
 
 # Environment and local config
 .env

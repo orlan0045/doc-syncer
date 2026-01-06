@@ -6,9 +6,38 @@ AI-powered documentation sync using Claude Code or Codex.
 Code changes (PR/branch) → Agent analyzes → Docs updated
 ```
 
+## Prerequisites
+
+### 1. Install Bun
+
+This package requires Bun runtime:
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+### 2. Install an AI agent
+
+You need one of these AI agents installed:
+
+```bash
+# Option 1: Claude Code CLI (agent: claude)
+npm install -g @anthropic-ai/claude-code
+claude  # authenticate once
+
+# Option 2: Codex CLI (agent: codex)
+# Follow Codex CLI installation instructions
+```
+
 ## Install
 
-### Via npm (recommended)
+### Via Bun (recommended)
+
+```bash
+bun install -g doc-syncer
+```
+
+### Via npm
 
 ```bash
 npm install -g doc-syncer
@@ -22,26 +51,13 @@ cd doc-syncer
 bun install
 ```
 
-## Prerequisites
-
-You need one of these AI agents installed:
-
-```bash
-# Option 1: Claude Code CLI (agent: claude)
-npm install -g @anthropic-ai/claude-code
-claude  # authenticate once
-
-# Option 2: Codex CLI (agent: codex)
-# Follow Codex CLI installation instructions
-```
-
 ## Setup
 
-Download the example config and customize it:
+Create your configuration file:
 
 ```bash
-# Download example config
-curl -o doc-syncer.config.yml https://raw.githubusercontent.com/orlan0045/doc-syncer/main/doc-syncer.config.example.yml
+# Create config from example
+doc-syncer init
 
 # Edit with your repo paths
 nano doc-syncer.config.yml
@@ -64,9 +80,12 @@ modes:
 
 ### Option 1: Config file (recommended)
 
-Run:
-
 ```bash
+# First time setup
+doc-syncer init                 # create config file
+# Edit doc-syncer.config.yml with your paths
+
+# Then run
 doc-syncer sync                 # run it
 doc-syncer sync --dry-run       # preview only
 doc-syncer sync --mode backend  # use specific mode from config

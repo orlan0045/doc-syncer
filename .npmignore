@@ -23,3 +23,8 @@ test/
 tests/
 *.test.ts
 *.spec.ts
+
+# Documentation
+AGENTS.md
+CLAUDE.md
+PUBLISHING.md
