@@ -24,7 +24,7 @@
     "url": "https://github.com/orlan0045/doc-syncer/issues"
   },
   "bin": {
-    "doc-syncer": "src/cli.ts"
+    "doc-syncer": "src/doc-sync.ts"
   },
   "files": [
     "src/",
@@ -34,9 +34,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "init": "cp doc-syncer.config.example.yml doc-syncer.config.yml",
-    "sync": "bun src/doc-sync.ts",
-    "sync:dry": "bun src/doc-sync.ts --dry-run",
+    "sync": "bun src/doc-sync.ts sync",
+    "sync:dry": "bun src/doc-sync.ts sync --dry-run",
     "prepublishOnly": "echo 'Ready to publish'"
   },
   "dependencies": {

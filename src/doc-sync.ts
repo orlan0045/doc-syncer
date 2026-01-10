@@ -1,18 +1,20 @@
 #!/usr/bin/env bun
 
 /**
- * doc-sync: AI-powered documentation sync using Claude Code or Codex
- * 
+ * doc-syncer: AI-powered documentation sync using Claude Code or Codex
+ *
  * Usage:
- *   bun sync --code ~/dev/app --docs ~/dev/app-docs
- *   bun sync --config doc-sync.yml
- *   bun sync --dry-run
+ *   doc-syncer --init
+ *   doc-syncer --code ~/dev/app --docs ~/dev/app-docs
+ *   doc-syncer --mode <name>
+ *   doc-syncer --dry-run
  */
 
 import { $ } from "bun";
 import { parseArgs } from "util";
-import { resolve } from "path";
+import { resolve, join } from "path";
 import { parse as parseYaml } from "yaml";
+import { homedir } from "os";
 
 // ============ TYPES ============
 
@@ -25,12 +27,77 @@ interface Config {
   agent: "claude" | "codex";
   permissions: string[];
   mode?: string;
+  promptTemplate?: string;
 }
 
 // ============ CONFIG ============
 
+async function initConfig(): Promise<void> {
+  const configPath = join(homedir(), ".doc-syncer.yml");
+  const configFile = Bun.file(configPath);
+
+  if (await configFile.exists()) {
+    console.log(`\n⚠️  Config file already exists: ${configPath}`);
+    console.log("\nTo edit it, run:");
+    console.log(`   open ${configPath}`);
+    console.log("   # or");
+    console.log(`   nano ${configPath}\n`);
+    return;
+  }
+
+  const defaultConfig = `# doc-syncer global configuration
+# This file lives in your home directory: ~/.doc-syncer.yml
+
+# Default agent: claude | codex
+agent: claude
+
+# Default base branch
+base_branch: main
+
+# Default permissions for the agent
+permissions:
+  - Read
+  - Write
+  - Edit
+
+# Modes: Configure multiple code/docs repo pairs
+# Run with: doc-syncer --mode <name>
+modes:
+  # Example mode - replace with your actual projects
+  my-project:
+    default: true  # This mode runs when you don't specify --mode
+    code_repo: /path/to/your/code-repo
+    docs_repo: /path/to/your/docs-repo
+
+    # Optional: Custom prompt template for this mode
+    # Create .doc-syncer-prompt.md in your code repo and reference it here
+    # prompt_template: /path/to/your/code-repo/.doc-syncer-prompt.md
+
+  # Add more modes as needed:
+  # another-project:
+  #   code_repo: /path/to/another/code-repo
+  #   docs_repo: /path/to/another/docs-repo
+  #   prompt_template: /path/to/another/code-repo/.doc-syncer-prompt.md
+`;
+
+  await Bun.write(configPath, defaultConfig);
+
+  console.log(`\n✅ Created config file: ${configPath}\n`);
+  console.log("Next steps:");
+  console.log("1. Edit the config file and set your repo paths:");
+  console.log(`   open ${configPath}`);
+  console.log("");
+  console.log("2. (Optional) Create custom prompt templates in your code repos:");
+  console.log("   touch /path/to/your/code-repo/.doc-syncer-prompt.md");
+  console.log("");
+  console.log("3. Run doc-syncer:");
+  console.log("   doc-syncer sync                    # Uses default mode");
+  console.log("   doc-syncer sync --mode my-project  # Uses specific mode");
+  console.log("");
+}
+
 async function loadConfig(): Promise<Config> {
-  const { values } = parseArgs({
+  const { values, positionals } = parseArgs({
     args: Bun.argv.slice(2),
     options: {
       "code-repo": { type: "string", short: "c" },
@@ -53,11 +120,57 @@ async function loadConfig(): Promise<Config> {
     process.exit(0);
   }
 
-  // Try config file first
-  const configPath = values.config || "doc-syncer.config.yml";
-  const configFile = Bun.file(configPath);
+  // Get command from positionals
+  const command = positionals[0];
 
-  if (await configFile.exists()) {
+  // Handle commands
+  if (!command) {
+    console.error("\n❌ No command provided.\n");
+    console.error("Available commands:");
+    console.error("  sync    Synchronize documentation based on code changes");
+    console.error("  init    Create global config file at ~/.doc-syncer.yml");
+    console.error("  help    Show help information\n");
+    printHelp();
+    process.exit(1);
+  }
+
+  if (command === "help") {
+    printHelp();
+    process.exit(0);
+  }
+
+  if (command === "init") {
+    await initConfig();
+    process.exit(0);
+  }
+
+  if (command !== "sync") {
+    console.error(`\n❌ Unknown command: ${command}\n`);
+    console.error("Available commands:");
+    console.error("  sync    Synchronize documentation based on code changes");
+    console.error("  init    Create global config file at ~/.doc-syncer.yml");
+    console.error("  help    Show help information\n");
+    printHelp();
+    process.exit(1);
+  }
+
+  // Try config file first
+  // Priority: --config flag > ~/.doc-syncer.yml > ./doc-syncer.config.yml
+  let configPath = values.config;
+
+  if (!configPath) {
+    const homeConfig = join(homedir(), ".doc-syncer.yml");
+    if (await Bun.file(homeConfig).exists()) {
+      configPath = homeConfig;
+    } else {
+      configPath = "doc-syncer.config.yml";
+    }
+  }
+
+  const configFile = Bun.file(configPath);
+  const configExists = await configFile.exists();
+
+  if (configExists) {
     const content = await configFile.text();
     const yaml = parseYaml(content);
 
@@ -92,6 +205,7 @@ async function loadConfig(): Promise<Config> {
         agent,
         permissions,
         mode: modeName,
+        promptTemplate: mode.prompt_template || mode.promptTemplate || yaml.prompt_template || yaml.promptTemplate,
       };
     }
 
@@ -106,6 +220,7 @@ async function loadConfig(): Promise<Config> {
       dryRun: values["dry-run"] || false,
       agent,
       permissions,
+      promptTemplate: yaml.prompt_template || yaml.promptTemplate,
     };
   }
 
@@ -115,6 +230,20 @@ async function loadConfig(): Promise<Config> {
   const agent = parseAgent(values.agent);
 
   if (!codeRepo || !docsRepo) {
+    // Show clear error message about what's missing
+    console.error("\n❌ No configuration found.\n");
+
+    const homeConfigPath = join(homedir(), ".doc-syncer.yml");
+    console.error("Checked for config at:");
+    console.error(`  • ${homeConfigPath} ${configExists && configPath === homeConfigPath ? "✓" : "✗"}`);
+    console.error(`  • ./doc-syncer.config.yml ${configExists && configPath === "doc-syncer.config.yml" ? "✓" : "✗"}`);
+
+    console.error("\nTo fix this, either:");
+    console.error("  1. Create a config file:");
+    console.error("     doc-syncer --init\n");
+    console.error("  2. Or provide paths via CLI:");
+    console.error("     doc-syncer --code ~/code/repo --docs ~/docs/repo\n");
+
     printHelp();
     process.exit(1);
   }
@@ -127,6 +256,7 @@ async function loadConfig(): Promise<Config> {
     dryRun: values["dry-run"] || false,
     agent,
     permissions: parsePermissions(undefined),
+    promptTemplate: undefined,
   };
 }
 
@@ -158,12 +288,15 @@ function parsePermissions(value: unknown): string[] {
 
 function printHelp() {
   console.log(`
-doc-sync: AI-powered documentation sync
+doc-syncer: AI-powered documentation sync
 
 Usage:
-  bun sync [options]
-  bun sync --mode <name> [options]
-  bun sync --code <path> --docs <path> [options]
+  doc-syncer <command> [options]
+
+Commands:
+  sync              Synchronize documentation based on code changes
+  init              Create global config file at ~/.doc-syncer.yml
+  help              Show this help information
 
 Options:
   -m, --mode        Mode preset to use (from config file)
@@ -171,16 +304,17 @@ Options:
   -d, --docs-repo   Path to documentation repository
   -b, --branch      Feature branch to analyze (default: current)
       --base        Base branch to diff against (default: main)
-      --config      Path to YAML config file (default: doc-syncer.config.yml)
+      --config      Path to YAML config file (default: ~/.doc-syncer.yml)
       --dry-run     Preview without running the agent
       --agent       AI agent to run (claude | codex)
   -h, --help        Show this help
 
 Examples:
-  bun sync                              # Use default mode from config
-  bun sync --mode esign                 # Use specific mode
-  bun sync --mode esign --dry-run       # Preview mode
-  bun sync --code ~/dev/app --docs ~/dev/app-docs
+  doc-syncer init                         # Create global config file
+  doc-syncer sync                         # Use default mode from config
+  doc-syncer sync --mode esign            # Use specific mode
+  doc-syncer sync --mode esign --dry-run  # Preview mode
+  doc-syncer sync --code ~/dev/app --docs ~/dev/app-docs
 `);
 }
 
@@ -377,7 +511,7 @@ async function main() {
   console.log(`   ${changedFiles.length} files changed\n`);
 
   // Build prompt
-  const prompt = buildPrompt(config, branch, diff, changedFiles);
+  const prompt = await buildPrompt(config, branch, diff, changedFiles);
 
   if (config.dryRun) {
     console.log("─".repeat(60));
@@ -432,17 +566,73 @@ async function main() {
   }
 }
 
-function buildPrompt(
+// ============ TEMPLATE HELPERS ============
+
+function renderTemplate(template: string, variables: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    return variables[key] !== undefined ? variables[key] : match;
+  });
+}
+
+async function resolveTemplatePath(config: Config): Promise<string | null> {
+  // Priority order:
+  // 1. Config-specified template (mode or global)
+  // 2. Default prompt-template.md in project root
+  // 3. null (fall back to hardcoded prompt)
+
+  const candidates: string[] = [];
+
+  // Add config template if specified
+  if (config.promptTemplate) {
+    candidates.push(resolve(config.promptTemplate));
+  }
+
+  // Add default template
+  candidates.push(resolve("prompt-template.md"));
+
+  // Check which one exists
+  for (const path of candidates) {
+    const exists = await Bun.file(path).exists();
+    if (exists) {
+      return path;
+    }
+  }
+
+  return null; // No template found, will use hardcoded
+}
+
+async function buildPrompt(
   config: Config,
   branch: string,
   diff: string,
   changedFiles: string[]
-): string {
+): Promise<string> {
   const maxDiff = 80000;
   const truncated = diff.length > maxDiff
     ? diff.slice(0, maxDiff) + `\n\n... [truncated, ${diff.length} chars total]`
     : diff;
 
+  // Try to load template
+  const templatePath = await resolveTemplatePath(config);
+
+  if (templatePath) {
+    // Use template with variable substitution
+    const templateContent = await Bun.file(templatePath).text();
+
+    const variables: Record<string, string> = {
+      codeRepo: config.codeRepo,
+      docsRepo: config.docsRepo,
+      branch: branch,
+      baseBranch: config.baseBranch,
+      changedFiles: changedFiles.map(f => `- ${f}`).join("\n"),
+      changedFilesCount: String(changedFiles.length),
+      diff: truncated,
+    };
+
+    return renderTemplate(templateContent, variables);
+  }
+
+  // Fallback to hardcoded prompt (backwards compatibility)
   return `You are a documentation expert. Update the docs in this repository based on code changes.
 
 ## Context
@@ -458,8 +648,6 @@ ${changedFiles.map(f => `- ${f}`).join("\n")}
 \`\`\`diff
 ${truncated}
 \`\`\`
-
-## Do the minimum necessary to update the docs!
 
 ## Task
 1. Explore this docs repo — understand structure and style

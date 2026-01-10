@@ -13,6 +13,11 @@ permissions:
   - Write
   - Edit
 
+# Optional: Custom prompt template file (global default for all modes)
+# Uses {{variable}} syntax for: codeRepo, docsRepo, branch, baseBranch,
+# changedFiles, changedFilesCount, diff
+# prompt_template: ./prompt-template.md
+
 # Modes allow you to configure multiple code/docs repo pairs
 # Use --mode <name> to select which mode to run
 modes:
@@ -21,6 +26,8 @@ modes:
     default: true  # Use this mode by default if --mode not specified
     code_repo: /path/to/your/code-repo
     docs_repo: /path/to/your/docs-repo
+    # Optional: Override prompt template for this mode
+    # prompt_template: ./prompts/frontend-template.md
 
   # Example mode 2: Backend API
   backend:
