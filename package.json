@@ -1,6 +1,6 @@
 {
   "name": "doc-syncer",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "AI-powered documentation sync using Claude Code or Codex",
   "type": "module",
   "author": "Andrii Orlov",
